@@ -21,8 +21,9 @@ from util.cutout import Cutout
 
 from model.resnet import ResNet18
 from model.wide_resnet import WideResNet
+from model.enas import Enas
 
-model_options = ['resnet18', 'wideresnet']
+model_options = ['resnet18', 'wideresnet', 'enas']
 dataset_options = ['cifar10', 'cifar100', 'svhn']
 
 parser = argparse.ArgumentParser(description='CNN')
@@ -48,6 +49,8 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=0,
                     help='random seed (default: 1)')
+parser.add_argument('--num_layers', type=int, default=7,
+                    help='number of enas layers')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -59,7 +62,7 @@ if args.cuda:
 
 test_id = args.dataset + '_' + args.model
 
-print args
+print(args)
 
 # Image Preprocessing
 if args.dataset == 'svhn':
@@ -85,12 +88,12 @@ test_transform = transforms.Compose([
 
 if args.dataset == 'cifar10':
     num_classes = 10
-    train_dataset = datasets.CIFAR10(root='data/',
+    train_dataset = datasets.CIFAR10(root='data/cifar',
                                      train=True,
                                      transform=train_transform,
                                      download=True)
 
-    test_dataset = datasets.CIFAR10(root='data/',
+    test_dataset = datasets.CIFAR10(root='data/cifar',
                                     train=False,
                                     transform=test_transform,
                                     download=True)
@@ -150,6 +153,10 @@ elif args.model == 'wideresnet':
     else:
         cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=10,
                          dropRate=0.3)
+elif args.model == 'enas':
+    arcs = ([1, 6, 0, 1, 1, 0, 0, 6, 1, 1, 0, 4, 0, 0, 4, 1, 0, 4, 1, 4],
+            [0, 5, 1, 1, 1, 6, 0, 2, 0, 5, 0, 3, 0, 0, 0, 5, 2, 3, 0, 1])
+    cnn = Enas(arcs, num_layers=num_layers)
 
 cnn = cnn.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
@@ -174,14 +181,14 @@ def test(loader):
             # SVHN labels are from 1 to 10, not 0 to 9, so subtract 1
             labels = labels.type_as(torch.LongTensor()).view(-1) - 1
 
-        images = Variable(images, volatile=True).cuda()
-        labels = Variable(labels, volatile=True).cuda()
+        images = images.cuda()
+        labels = labels.cuda()
 
-        pred = cnn(images)
+        outputs = cnn(images)
 
-        pred = torch.max(pred.data, 1)[1]
+        _, pred = outputs.max(1)
         total += labels.size(0)
-        correct += (pred == labels.data).sum()
+        correct += pred.eq(labels).sum().item()
 
     val_acc = correct / total
     cnn.train()
@@ -202,22 +209,22 @@ for epoch in range(args.epochs):
             # SVHN labels are from 1 to 10, not 0 to 9, so subtract 1
             labels = labels.type_as(torch.LongTensor()).view(-1) - 1
 
-        images = Variable(images).cuda(async=True)
-        labels = Variable(labels).cuda(async=True)
+        images = images.cuda()
+        labels = labels.cuda()
 
         cnn.zero_grad()
-        pred = cnn(images)
+        outputs = cnn(images)
 
-        xentropy_loss = criterion(pred, labels)
+        xentropy_loss = criterion(outputs, labels)
         xentropy_loss.backward()
         cnn_optimizer.step()
 
-        xentropy_loss_avg += xentropy_loss.data[0]
+        xentropy_loss_avg += xentropy_loss.item()
 
         # Calculate running average of accuracy
-        _, pred = torch.max(pred.data, 1)
+        _, pred = outputs.max(1)
         total += labels.size(0)
-        correct += (pred == labels.data).sum()
+        correct += pred.eq(labels).sum().item()
         accuracy = correct / total
 
         progress_bar.set_postfix(
