@@ -156,7 +156,7 @@ elif args.model == 'wideresnet':
 elif args.model == 'enas':
     arcs = ([1, 6, 0, 1, 1, 0, 0, 6, 1, 1, 0, 4, 0, 0, 4, 1, 0, 4, 1, 4],
             [0, 5, 1, 1, 1, 6, 0, 2, 0, 5, 0, 3, 0, 0, 0, 5, 2, 3, 0, 1])
-    cnn = Enas(arcs, num_layers=num_layers)
+    cnn = Enas(arcs, num_layers=args.num_layers)
 
 cnn = cnn.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
