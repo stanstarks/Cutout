@@ -137,8 +137,8 @@ class Enas(nn.Module):
     def __init__(self, arcs, out_filters=20, num_layers=6, num_classes=10):
         super(Enas, self).__init__()
         self.num_layers = num_layers
-        pool_distance = 3
-        pool_num = self.num_layers // pool_distance
+        pool_num = 3
+        pool_distance = self.num_layers // pool_num
         self.pool_layers = [i * pool_distance + 2 for i in range(pool_num)]
         enas_blocks = []
         enas_outputs = []

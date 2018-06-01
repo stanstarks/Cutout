@@ -49,8 +49,11 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=0,
                     help='random seed (default: 1)')
-parser.add_argument('--num_layers', type=int, default=7,
+parser.add_argument('--num_layers', type=int, default=15,
                     help='number of enas layers')
+parser.add_argument('--out_filters', type=int, default=36,
+                    help='number of enas layers')
+parser.add_argument('--fixed_arc', default='foo')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -154,9 +157,9 @@ elif args.model == 'wideresnet':
         cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=10,
                          dropRate=0.3)
 elif args.model == 'enas':
-    arcs = ([1, 6, 0, 1, 1, 0, 0, 6, 1, 1, 0, 4, 0, 0, 4, 1, 0, 4, 1, 4],
-            [0, 5, 1, 1, 1, 6, 0, 2, 0, 5, 0, 3, 0, 0, 0, 5, 2, 3, 0, 1])
-    cnn = Enas(arcs, num_layers=args.num_layers)
+    arcs = [int(x) for x in args.fixed_arc.split()]
+    arcs = (arcs[:20], arcs[20:])
+    cnn = Enas(arcs, out_filters=args.out_filters,  num_layers=args.num_layers)
 
 cnn = cnn.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
@@ -165,6 +168,8 @@ cnn_optimizer = torch.optim.SGD(cnn.parameters(), lr=args.learning_rate,
 
 if args.dataset == 'svhn':
     scheduler = MultiStepLR(cnn_optimizer, milestones=[80, 120], gamma=0.1)
+elif args.model == 'enas':
+    scheduler = MultiStepLR(cnn_optimizer, milestones=[100, 200, 300], gamma=0.2)
 else:
     scheduler = MultiStepLR(cnn_optimizer, milestones=[60, 120, 160], gamma=0.2)
 
